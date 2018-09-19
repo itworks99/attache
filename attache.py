@@ -4,6 +4,7 @@
 
 import time
 import os
+import pyclamd
 # ------------------------------------------
 # Pi settings:
 # ------------------------------------------
@@ -31,6 +32,8 @@ clamavLocation = "/usr/bin/clambc"
 
 mountedVolumes = []
 mountedVolumesOnStart = []
+scanVolumes = []
+scanOutput  = []
 
 configFilePresent = None
 clamavPresent = None
@@ -41,7 +44,7 @@ def checkMountedDevices(outputArray):
   mountedDevices = open(mountsLocation)
   for mountedDevice in mountedDevices:
     if mountedDevice.startswith(mountedDeviceMask):
-        outputArray.append(mountedDevice.split(' ')[0])
+        outputArray.append((mountedDevice.split(' ')[1]).replace('\\040',' '))
   mountedDevices.close()
   return outputArray
 
@@ -78,8 +81,11 @@ def checkFilePresence(location):
 # ------------------------------------------
 # ATTACHE INIT
 # ------------------------------------------
+clamavDaemon = pyclamd.ClamdAgnostic()
 configFilePresent = checkFilePresence(configFile)
-clamavPresent = checkFilePresence(clamavLocation)
+clamavPresent = clamavDaemon.ping()
+print(clamavPresent)
+print(clamavDaemon.version())
 checkMountedDevices(mountedVolumesOnStart)
 print(sorted(mountedVolumesOnStart))
 # ------------------------------------------
@@ -87,3 +93,16 @@ print(sorted(mountedVolumesOnStart))
 # ------------------------------------------
 while True:
   checkMountedDevices(mountedVolumes)
+  if mountedVolumes != mountedVolumesOnStart:
+    scanVolumes.append((set(mountedVolumes) - set(mountedVolumesOnStart)))
+    scanVolume = (str(scanVolumes).replace("[{'", "").replace("'}]", ''))
+    print(str(scanVolume))
+    scanOutput = str(clamavDaemon.contscan_file(str(scanVolume)))
+    if scanOutput.find('ERROR'):
+          print('ERROR:')
+          print('------')
+          print (scanOutput)
+    mountedVolumes.clear()
+    break    
+  else:
+    mountedVolumes.clear()

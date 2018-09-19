@@ -1,0 +1,1 @@
+sudo apt-get -y install git ntp python3 python3-pip python3-pyclamd amavisd-new neofetch arj bzip2 cabextract cpio file gzip lha nomarch pax rar unrar unzip unzoo zip zoo;
