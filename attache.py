@@ -2,9 +2,7 @@ import RPi.GPIO as GPIO
 import Adafruit_GPIO.SPI as SPI
 import Adafruit_SSD1306
 
-import time
-import os
-import pyclamd
+import sys,time,os,pyclamd
 
 from PIL import Image
 from PIL import ImageDraw
@@ -28,9 +26,18 @@ SPI_PORT = 0
 SPI_DEVICE = 0
 
 # Attache configuration
+P_WAIT = 0
+
 configFile = "/etc/attache.conf"
 mountsLocation = "/proc/mounts"
 mountedDeviceMask = "/dev/sd"
+
+virusFoundMarker = 'FOUND'
+
+repairCommmand = "clamdscan --remove=yes "
+repairReport = " > /tmp/report.tmp"
+
+clamavReport = []
 
 fontName = "visitor1.ttf"
 fontSizeSmall = 10
@@ -80,7 +87,27 @@ def printLarge1306(x, y, text):
 def clear1306():
     draw.rectangle((0, 0, width, height), outline=0, fill=0)  # Draw a black filled box to clear the image
     disp.display()
-    return
+    return  
+
+
+def scanfile(file):
+    # Call libclamav thought pyclamav
+    try:
+        ret=pyclamd.scanfile(file)
+    except (ValueError, e):
+        print ('** A problem as occured :', e, '("'+file+'")')
+        return None
+    except (TypeError, e):
+        print ('** A problem as occured :', e, '("'+file+'")')
+        return None
+    else:
+        # Check return tupple
+        if ret[0]==0:
+            print (file, 'is not infected')
+            return True
+        elif ret[0]==1:
+            print (file, 'is infected with', ret[1])
+            return False
 
 # ------------------------------------------
 # INIT
@@ -131,16 +158,35 @@ printLarge1306(0, 0, "Ready")
 # Main loop
 # ------------------------------------------
 while True:
+    print(clamavDaemon.stats().split()[0])
+    time.sleep(secondsToWait)
     checkMountedDevices(mountedVolumes)
-    if mountedVolumes != mountedVolumesOnStart:
+    if mountedVolumes > mountedVolumesOnStart:
         scanVolumes.append((set(mountedVolumes) - set(mountedVolumesOnStart)))
         scanVolume = str(scanVolumes).replace("[{'", "").replace("'}]", "")
-        print(str(scanVolume))
+        
+        clear1306()
+        printLarge1306(0, 0, 'Scanning')
+        printSmall1306(0, 14, scanVolume.replace('/media/',''))
         scanOutput = str(clamavDaemon.contscan_file(str(scanVolume)))
-        if scanOutput.find("ERROR"):
-            print("ERROR:")
-            print("------")
-            print(scanOutput)
+        foundcounter = 0
+        last_found = -1  # Begin at -1 so the next position to search from is 0
+        while True:
+            last_found = scanOutput.find(virusFoundMarker, last_found + 1)
+            if last_found == -1:  
+                break  # All occurrences have been found
+            else:
+                foundcounter += 1
+                clear1306()
+                printLarge1306(0, 0, 'found '+ str(foundcounter))
+                printLarge1306(0, 14, 'viruses')        
+        
+        if foundcounter > 0:
+            printLarge1306(0, 28, 'cleaning...')
+            print (repairCommmand + scanVolume + repairReport)
+            execRepair = os.spawnl(P_WAIT, (repairCommmand + scanVolume + repairReport))
+
+        printLarge1306(0, 42, 'done! ')
         mountedVolumes.clear()
         break
     else:
