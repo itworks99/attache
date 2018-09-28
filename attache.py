@@ -43,11 +43,11 @@ fontName = "visitor1.ttf"
 fontSizeSmall = 10
 fontSizeLarge = 20
 
-secondsToWait = 3
+secondsToWait = 2
 
 mountedVolumes = []
 mountedVolumesOnStart = []
-scanVolumes = []
+volumesToScan = []
 scanOutput = []
 
 configFilePresent = None
@@ -87,8 +87,45 @@ def printLarge1306(x, y, text):
 def clear1306():
     draw.rectangle((0, 0, width, height), outline=0, fill=0)  # Draw a black filled box to clear the image
     disp.display()
-    return  
+    return
 
+def progressDot(x,y):
+    xyDot = [[0, 0], [1, 0], [2, 0], [3, 0], [3, 1], [3, 2], [3, 3], [2, 3], [1, 3], [0, 3], [0, 2], [0, 1]]
+    xSize = 4
+    ySize = 2
+    prevItem = [0,1]
+    for item in xyDot:
+        draw.rectangle((x*item[0], y*item[1],x*item[0]+xSize, y*item[1]+ySize),outline=255, fill=255)
+        draw.rectangle((x*prevItem[0], y*prevItem[1], x*prevItem[0] + xSize, y*prevItem[1] + ySize), outline=0, fill=0)        
+        disp.image(image)
+        disp.display()
+        time.sleep(secondsToWait)
+        prevItem = item
+    return
+                
+
+def scanForViruses(volumeToScan):
+    clear1306()
+    printLarge1306(0, 0, 'Scanning')
+    printSmall1306(0, 14, volumeToScan.replace('/media/',''))
+    scanOutput = str(clamavDaemon.contscan_file(str(volumeToScan)))
+    foundcounter = 0
+    last_found = -1  # Begin at -1 so the next position to search from is 0
+    while True:
+        last_found = scanOutput.find(virusFoundMarker, last_found + 1)
+        if last_found == -1:  
+            break  # All occurrences have been found
+        else:
+            foundcounter += 1
+            clear1306()
+    printLarge1306(0, 0, 'found '+ str(foundcounter))
+    printLarge1306(0, 14, 'viruses')        
+    
+    if foundcounter > 0:
+        printLarge1306(0, 28, 'cleaning...')
+        print (repairCommmand + volumeToScan + repairReport)
+        os.spawnl(P_WAIT, (repairCommmand + volumeToScan + repairReport))
+    return True
 
 def scanfile(file):
     # Call libclamav thought pyclamav
@@ -154,40 +191,29 @@ printLarge1306(0, 30, "ok.")
 time.sleep(secondsToWait)
 clear1306()
 printLarge1306(0, 0, "Ready")
+
+progressDot(2,2)
+
 # ------------------------------------------
 # Main loop
 # ------------------------------------------
 while True:
     print(clamavDaemon.stats().split()[0])
-    time.sleep(secondsToWait)
+#    time.sleep(secondsToWait)
     checkMountedDevices(mountedVolumes)
     if mountedVolumes > mountedVolumesOnStart:
-        scanVolumes.append((set(mountedVolumes) - set(mountedVolumesOnStart)))
-        scanVolume = str(scanVolumes).replace("[{'", "").replace("'}]", "")
+        volumesToScan.append((set(mountedVolumes) - set(mountedVolumesOnStart)))
+        print (volumesToScan)
+        for volumeRecord in volumesToScan:
+            volumeToScan = str(volumeRecord).replace("[{'", "").replace("'}]", "")
+
+            scanForViruses(volumeToScan)        
         
-        clear1306()
-        printLarge1306(0, 0, 'Scanning')
-        printSmall1306(0, 14, scanVolume.replace('/media/',''))
-        scanOutput = str(clamavDaemon.contscan_file(str(scanVolume)))
-        foundcounter = 0
-        last_found = -1  # Begin at -1 so the next position to search from is 0
-        while True:
-            last_found = scanOutput.find(virusFoundMarker, last_found + 1)
-            if last_found == -1:  
-                break  # All occurrences have been found
-            else:
-                foundcounter += 1
-                clear1306()
-                printLarge1306(0, 0, 'found '+ str(foundcounter))
-                printLarge1306(0, 14, 'viruses')        
-        
-        if foundcounter > 0:
-            printLarge1306(0, 28, 'cleaning...')
-            print (repairCommmand + scanVolume + repairReport)
-            execRepair = os.spawnl(P_WAIT, (repairCommmand + scanVolume + repairReport))
+        volumesToScan.clear()
 
         printLarge1306(0, 42, 'done! ')
+
         mountedVolumes.clear()
-        break
+        mountedVolumesOnStart =  mountedVolumes
     else:
         mountedVolumes.clear()
