@@ -89,20 +89,37 @@ def clear1306():
     disp.display()
     return
 
-def progressDot(x,y):
-    xyDot = [[0, 0], [1, 0], [2, 0], [3, 0], [3, 1], [3, 2], [3, 3], [2, 3], [1, 3], [0, 3], [0, 2], [0, 1]]
-    xSize = 4
-    ySize = 2
-    prevItem = [0,1]
-    for item in xyDot:
-        draw.rectangle((x*item[0], y*item[1],x*item[0]+xSize, y*item[1]+ySize),outline=255, fill=255)
-        draw.rectangle((x*prevItem[0], y*prevItem[1], x*prevItem[0] + xSize, y*prevItem[1] + ySize), outline=0, fill=0)        
+def progressDot(x, y, SizeFactor = 1):
+    startDot = [[0, 0], [8, 0], [16, 0], [24, 0], [24, 8], [24, 8], [24, 24], [16, 24], [8, 24], [0, 24], [0, 16], [0, 8]]
+    xSize = SizeFactor
+    ySize = SizeFactor
+    prevItem = [0,0]
+
+    for item in startDot:
+        xPrevItem = prevItem[0]
+        yPrevItem = prevItem[1]
+        xItem = item[0]
+        yItem = item[1]
+
+        startPrevX = (xPrevItem * xSize) + x
+        startPrevY = (yPrevItem * ySize) + y
+        endPrevX = ((xPrevItem + 8) * xSize) + x
+        endPrevY = ((yPrevItem + 8) * ySize) + y
+
+        startX = (xItem * xSize) + x
+        startY = (yItem * ySize) + y
+        endX = ((xItem + 8) * xSize) + x
+        endY = ((yItem + 8) * ySize) + y
+
+        # Remove the prev first as that way when it is actual the first spot it does nothing
+        draw.rectangle((startPrevX, startPrevY, endPrevX, endPrevY),outline=0, fill=0)
+        draw.rectangle((startX, startY, endX, endY),outline=255, fill=255)
+
         disp.image(image)
         disp.display()
         time.sleep(secondsToWait)
         prevItem = item
     return
-                
 
 def scanForViruses(volumeToScan):
     clear1306()
